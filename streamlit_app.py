@@ -3,10 +3,9 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import matplotlib.pyplot as plt
-import io
 
-# Set up OpenAI API key (hardcoded for local testing)
-openai.api_key = "insert-api-key"  # Replace with your actual API key
+
+openai.api_key = "Your-api-key"  # Replace with your actual API key
 
 # Initialize SQLite database
 conn = sqlite3.connect('tennis_app.db')
@@ -16,7 +15,7 @@ cursor = conn.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS players (
         id INTEGER PRIMARY KEY,
-        name TEXT,
+        name TEXT UNIQUE,  -- Make 'name' unique to avoid duplicates
         utr REAL,
         preferred_format TEXT,
         first_serve_percentage INTEGER,
@@ -30,16 +29,19 @@ conn.commit()
 
 # Function to save player data to SQLite
 def save_player_to_db(player_data):
-    cursor.execute('''
-        INSERT INTO players (name, utr, preferred_format, first_serve_percentage, winners, 
-                             unforced_error_percentage, win_rate, double_faults)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        player_data["Name"], player_data["UTR"], player_data["Preferred Format"],
-        player_data["First Serve %"], player_data["Winners"], player_data["Unforced Error %"],
-        player_data["Win Rate %"], player_data["Double Faults"]
-    ))
-    conn.commit()
+    try:
+        cursor.execute('''
+            INSERT OR IGNORE INTO players (name, utr, preferred_format, first_serve_percentage, winners, 
+                                           unforced_error_percentage, win_rate, double_faults)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            player_data["Name"], player_data["UTR"], player_data["Preferred Format"],
+            player_data["First Serve %"], player_data["Winners"], player_data["Unforced Error %"],
+            player_data["Win Rate %"], player_data["Double Faults"]
+        ))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass
 
 # Function to retrieve all players from SQLite
 def get_players_from_db():
@@ -70,36 +72,27 @@ def delete_player_from_db(player_id):
 def get_ai_pairing_suggestions(players):
     messages = [{"role": "system", "content": "You are a tennis pairing expert."}]
     
+    prompt = "Create a tennis team line-up based on their qualities..."
+    
     # Add player information to the prompt
-    prompt = "Create a tennis team line-up based on their qualities: UTR, preferred format, first serve percentage, winners, unforced error percentage, win rate, and double faults. Make sure that you are always outputting the lineup in the same format. It should be like this: (new line) -Singles 1: \"Player Name\"  (new line) \n-Singles 2: \"Player Name\" etc. (2 new lines) \n\n-Doubles 1: \"Player Name & Player Name\" (new line) \n-Doubles 2: \"Player Name & Player Name\" etc. (2 new lines) \n\n(if there are extra players you could also possibly make substitution combos).\n\nThen after you list them out like that, make sure to offer a straightforward and simple explanation to the lineup. It should just be one paragraph! No bullet points! \n\nHere is the list of players:"
-
     for player in players:
         prompt += (f"Name: {player['Name']}, UTR: {player['UTR']}, Format: {player['Preferred Format']}, "
                    f"First Serve %: {player['First Serve %']}, Winners: {player['Winners']}, "
                    f"Unforced Error %: {player['Unforced Error %']}, Win Rate %: {player['Win Rate %']}, "
                    f"Double Faults: {player['Double Faults']}\n")
     
-
-    prompt += "# of Singles players: " + singles + "# of Doubles pairs" + doubles + "\n"
-
-    prompt += "\nProvide the most fitting pairs based on all player qualities."
-
-    # Add the user's request to the messages list
     messages.append({"role": "user", "content": prompt})
 
-    # Call the ChatCompletion API with the GPT-3.5-turbo model
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages,
         max_tokens=300,
         temperature=0.7
     )
-
-    # Extract the generated pairing suggestions
     return response['choices'][0]['message']['content'].strip()
 
 # App title and description
-st.title("Tennis Doubles Pairing App")
+st.title("CourtBot")
 st.subheader("Add Players and Find Optimal Pairings using AI")
 
 # CSV Template for users to download with two example players and up to 20 rows
@@ -152,7 +145,6 @@ if uploaded_file:
 st.write("### Enter Lineup Format")
 singles = st.text_input("Number of singles players")
 doubles = st.text_input("Number of doubles pairs")
-
 
 st.write("### Enter Player Details Manually")
 name = st.text_input("Player Name")
@@ -223,6 +215,7 @@ def plot_metric(players, metric):
         plt.xticks(rotation=45)
         plt.tight_layout()
         st.pyplot(plt)
+
 
     except ValueError:
         st.error("Failed to plot the metric. Please ensure all values are numeric.")
