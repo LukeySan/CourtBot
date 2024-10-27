@@ -5,7 +5,7 @@ import sqlite3
 import matplotlib.pyplot as plt
 
 
-openai.api_key = "Your-api-key"  # Replace with your actual API key
+openai.api_key = "your-api-key"  # Replace with your actual API key
 
 # Initialize SQLite database
 conn = sqlite3.connect('tennis_app.db')
@@ -72,7 +72,7 @@ def delete_player_from_db(player_id):
 def get_ai_pairing_suggestions(players):
     messages = [{"role": "system", "content": "You are a tennis pairing expert."}]
     
-    prompt = "Create a tennis team line-up based on their qualities..."
+    prompt = "Create a tennis team line-up based on their qualities: UTR, preferred format, first serve percentage, winners, unforced error percentage, win rate, and double faults. Make sure that you are always outputting the lineup in the same format. It should be like this:(2 New lines) -Singles 1: “Player Name” (new line) -Singles 2: “Player Name” etc. (2 new lines) -Doubles 1: “Player Name & Player Name”(New line) -Doubles 2: “Player Name & Player Name” etc. (2 new lines)(if there are extra players you could also possibly make substitutions combos). Then after you list them out like that make sure to offer a straightforward and simple explanation to the lineup.\n Here is the list of players:"
     
     # Add player information to the prompt
     for player in players:
@@ -80,6 +80,8 @@ def get_ai_pairing_suggestions(players):
                    f"First Serve %: {player['First Serve %']}, Winners: {player['Winners']}, "
                    f"Unforced Error %: {player['Unforced Error %']}, Win Rate %: {player['Win Rate %']}, "
                    f"Double Faults: {player['Double Faults']}\n")
+        
+        prompt += "Number of sinlges players: " + singles + "Number of doubles pairs: " + doubles
     
     messages.append({"role": "user", "content": prompt})
 
